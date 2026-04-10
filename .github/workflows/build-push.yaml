@@ -14,7 +14,7 @@ permissions:
   packages: write
 
 jobs:
-  build-base:
+  build:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -27,101 +27,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push base variant (warms cache)
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: COLOR=blue
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:blue
-          cache-from: type=gha,scope=rollouts
-          cache-to: type=gha,mode=max,scope=rollouts
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Argo Rollouts Demo with OTLP metrics
-            org.opencontainers.image.licenses=Apache-2.0
+      - name: Build and push all variants
+        run: |
+          COLORS="blue green yellow orange purple red"
+          VARIANTS="good bad slow"
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
 
-  build-variants:
-    needs: build-base
-    runs-on: ubuntu-24.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Base colors (blue already built in build-base)
-          - tag: green
-            color: green
-          - tag: yellow
-            color: yellow
-          - tag: orange
-            color: orange
-          - tag: purple
-            color: purple
-          - tag: red
-            color: red
-          # Error-rate variants
-          - tag: bad-blue
-            color: blue
-            error_rate: "15"
-          - tag: bad-green
-            color: green
-            error_rate: "15"
-          - tag: bad-yellow
-            color: yellow
-            error_rate: "15"
-          - tag: bad-orange
-            color: orange
-            error_rate: "15"
-          - tag: bad-purple
-            color: purple
-            error_rate: "15"
-          - tag: bad-red
-            color: red
-            error_rate: "15"
-          # Latency variants
-          - tag: slow-blue
-            color: blue
-            latency: "2"
-          - tag: slow-green
-            color: green
-            latency: "2"
-          - tag: slow-yellow
-            color: yellow
-            latency: "2"
-          - tag: slow-orange
-            color: orange
-            latency: "2"
-          - tag: slow-purple
-            color: purple
-            latency: "2"
-          - tag: slow-red
-            color: red
-            latency: "2"
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-
-      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push ${{ matrix.tag }}
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: |
-            COLOR=${{ matrix.color }}
-            ERROR_RATE=${{ matrix.error_rate }}
-            LATENCY=${{ matrix.latency }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
-          cache-from: type=gha,scope=rollouts
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Argo Rollouts Demo (${{ matrix.tag }})
-            org.opencontainers.image.licenses=Apache-2.0
+          for COLOR in $COLORS; do
+            for VARIANT in $VARIANTS; do
+              case $VARIANT in
+                bad)  EXTRA_ARGS="--build-arg ERROR_RATE=15"; TAG="bad-${COLOR}" ;;
+                slow) EXTRA_ARGS="--build-arg LATENCY=2";     TAG="slow-${COLOR}" ;;
+                *)    EXTRA_ARGS="";                          TAG="${COLOR}" ;;
+              esac
+              docker buildx build --platform linux/amd64,linux/arm64 --push \
+                --build-arg "COLOR=${COLOR}" ${EXTRA_ARGS} \
+                --tag "${IMAGE}:${TAG}" \
+                --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                --label "org.opencontainers.image.description=Argo Rollouts Demo (${TAG})" \
+                --label "org.opencontainers.image.licenses=Apache-2.0" .
+            done
+          done
