@@ -1,7 +1,8 @@
-FROM golang:1.25.9 AS build
+FROM --platform=$BUILDPLATFORM golang:1.25.9 AS build
+ARG TARGETARCH
 WORKDIR /go/src/app
 COPY . .
-RUN make
+RUN GOARCH=$TARGETARCH make
 
 FROM scratch
 COPY *.html ./
