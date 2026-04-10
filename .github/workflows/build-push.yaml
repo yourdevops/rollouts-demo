@@ -48,3 +48,10 @@ jobs:
                 --label "org.opencontainers.image.licenses=Apache-2.0" .
             done
           done
+
+      - uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: rollouts-demo
+          package-type: container
+          delete-only-untagged-versions: 'true'
+          min-versions-to-keep: 0
