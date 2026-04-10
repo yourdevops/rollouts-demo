@@ -1,7 +1,6 @@
 # Argo Rollouts Demo Application
 
-This repo contains the [Argo Rollouts](https://github.com/argoproj/argo-rollouts) demo application source code and examples. It demonstrates the
-various deployment strategies and progressive delivery features of Argo Rollouts.
+A fork of [argoproj/rollouts-demo](https://github.com/argoproj/rollouts-demo) with OpenTelemetry metrics built in. The app pushes HTTP request duration and in-flight request counts to any OTLP-compatible backend (e.g. VictoriaMetrics, Grafana Alloy, Datadog) via the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable. RPS, latency percentiles, and error rates can be derived from the histogram at query time.
 
 ![img](./demo.png)
 
@@ -46,20 +45,16 @@ kubectl argo rollouts get experiment <EXPERIMENT-NAME> --watch
 
 3. For rollouts, trigger an update by setting the image of a new color to run:
 ```bash
-kubectl argo rollouts set image <ROLLOUT-NAME> "*=argoproj/rollouts-demo:yellow"
+kubectl argo rollouts set image <ROLLOUT-NAME> "*=ghcr.io/yourdevops/rollouts-demo:yellow"
 ```
 
 ## Images
 
-Available images colors are: red, orange, yellow, green, blue, purple (e.g. `argoproj/rollouts-demo:yellow`). Also available are:
-* High error rate images, prefixed with the word `bad` (e.g. `argoproj/rollouts-demo:bad-yellow`)
-* High latency images, prefixed with the word `slow` (e.g. `argoproj/rollouts-demo:slow-yellow`)
+Available image colors are: red, orange, yellow, green, blue, purple (e.g. `ghcr.io/yourdevops/rollouts-demo:yellow`). Also available are:
+* High error rate images, prefixed with `bad` (e.g. `ghcr.io/yourdevops/rollouts-demo:bad-yellow`)
+* High latency images, prefixed with `slow` (e.g. `ghcr.io/yourdevops/rollouts-demo:slow-yellow`)
 
 
 ## Releasing
 
-To release new images:
-
-```bash
-make release IMAGE_NAMESPACE=argoproj DOCKER_PUSH=true
-```
+Images are built and pushed automatically by GitHub Actions on push to `master`. See `.github/workflows/build-push.yaml`. All 18 color/error/latency variants are published to `ghcr.io/yourdevops/rollouts-demo`.

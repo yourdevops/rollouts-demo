@@ -1,4 +1,4 @@
-FROM golang:1.16 as build
+FROM golang:1.25.9 AS build
 WORKDIR /go/src/app
 COPY . .
 RUN make
@@ -17,5 +17,8 @@ ARG ERROR_RATE
 ENV ERROR_RATE=${ERROR_RATE}
 ARG LATENCY
 ENV LATENCY=${LATENCY}
+
+# OTLP metrics push endpoint — override at runtime via env or k8s manifest
+ENV OTEL_EXPORTER_OTLP_ENDPOINT=""
 
 ENTRYPOINT [ "/rollouts-demo" ]

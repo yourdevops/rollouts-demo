@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -72,7 +72,14 @@ func main() {
 	flag.BoolVar(&tls, "tls", false, "Enable TLS (with self-signed certificate)")
 	flag.Parse()
 
-	rand.Seed(time.Now().UnixNano())
+	// 3s is enough for TCP+TLS dial to the OTLP collector; keeps pod startup
+	// fast so Kubernetes readiness probes are not delayed.
+	meterCtx, meterCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	inst, meterProvider, meterErr := initMeter(meterCtx)
+	meterCancel() // release immediately; context only needed during init
+	if meterErr != nil {
+		log.Fatalf("Failed to initialize metrics: %v", meterErr)
+	}
 
 	router := http.NewServeMux()
 	router.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./"))))
@@ -80,7 +87,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:    listenAddr,
-		Handler: router,
+		Handler: metricsMiddleware(inst, router),
 	}
 	if tls {
 		tlsConfig, err := CreateServerTLSConfig("", "", []string{"localhost", "rollouts-demo"})
@@ -106,9 +113,15 @@ func main() {
 		case <-delay.C:
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		if err := server.Shutdown(ctx); err != nil {
+		meterShutdownCtx, meterShutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer meterShutdownCancel()
+		if err := meterProvider.Shutdown(meterShutdownCtx); err != nil {
+			log.Printf("MeterProvider shutdown error: %v", err)
+		}
+
+		serverCtx, serverCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer serverCancel()
+		if err := server.Shutdown(serverCtx); err != nil {
 			log.Fatalf("Could not gracefully shutdown the server: %v\n", err)
 		}
 		close(done)
@@ -137,11 +150,11 @@ type colorParameters struct {
 }
 
 func getColor(w http.ResponseWriter, r *http.Request) {
-	requestBody, err := ioutil.ReadAll(r.Body)
+	requestBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(500)
 		log.Println(err.Error())
-		fmt.Fprintf(w, err.Error())
+		fmt.Fprint(w, err.Error())
 		return
 	}
 
@@ -151,7 +164,7 @@ func getColor(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(500)
 			log.Printf("%s: %v", string(requestBody), err.Error())
-			fmt.Fprintf(w, err.Error())
+			fmt.Fprint(w, err.Error())
 			return
 		}
 	}
