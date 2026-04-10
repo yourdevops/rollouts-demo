@@ -45,13 +45,7 @@ jobs:
                 --tag "${IMAGE}:${TAG}" \
                 --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
                 --label "org.opencontainers.image.description=Argo Rollouts Demo (${TAG})" \
-                --label "org.opencontainers.image.licenses=Apache-2.0" .
+                --annotation "index:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+                --annotation "index:org.opencontainers.image.description=Argo Rollouts Demo (${TAG})" .
             done
           done
-
-      - uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
-        with:
-          package-name: rollouts-demo
-          package-type: container
-          delete-only-untagged-versions: 'true'
-          min-versions-to-keep: 0
