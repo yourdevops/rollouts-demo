@@ -42,8 +42,8 @@ func initMeter(ctx context.Context) (*instruments, *sdkmetric.MeterProvider, err
 
 	requestDuration, err := meter.Float64Histogram(
 		"http.server.request.duration",
-		metric.WithDescription("HTTP request duration in seconds"),
-		metric.WithUnit("s"),
+		metric.WithDescription("HTTP request duration in milliseconds"),
+		metric.WithUnit("ms"),
 	)
 	if err != nil {
 		shutdownOnErr()
@@ -123,7 +123,7 @@ func metricsMiddleware(inst *instruments, next http.Handler) http.Handler {
 			attribute.String("http.route", path),
 			attribute.Int("http.response.status_code", rec.statusCode),
 		)
-		inst.requestDuration.Record(ctx, time.Since(start).Seconds(), attrs)
+		inst.requestDuration.Record(ctx, float64(time.Since(start).Milliseconds()), attrs)
 	})
 }
 
